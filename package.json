@@ -1,7 +1,8 @@
 {
-  "name": "e-arcs-app",
+  "name": "e-cooperative-app",
   "version": "1.0.0",
-  "description": "E-ARCS - Electronic Assam Registration of Cooperative Societies (installable app)",
+  "description": "E-COOPERATIVE - Digital App For Cooperation Department Assam 
+  (installable app)",
   "scripts": {
     "sync": "npx cap sync",
     "add:android": "npx cap add android",
