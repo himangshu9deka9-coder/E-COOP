@@ -1,8 +1,7 @@
 {
   "name": "e-cooperative-app",
   "version": "1.0.0",
-  "description": "E-COOPERATIVE" - Digital App For Cooperation Department Assam 
-  (installable app),
+  "description": "E-COOPERATIVE" ,
   "scripts": {
     "sync": "npx cap sync",
     "add:android": "npx cap add android",
