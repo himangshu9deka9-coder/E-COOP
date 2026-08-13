@@ -1,7 +1,7 @@
 {
-  "name": "E - Cooperative | E-ARCS Goalpara",
-  "short_name": "E-ARCS",
-  "description": "Electronic - Assam Registration of Cooperative Societies, Goalpara",
+  "name": "E - Cooperative | E-COOP ASSAM",
+  "short_name": "E-COOP",
+  "description": "E-COOPERATIVE - Digital App For  Cooperative Societies, Assam",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
