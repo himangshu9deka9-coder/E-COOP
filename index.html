@@ -1819,6 +1819,62 @@ textarea{ resize:vertical; min-height:56px; }
             background: linear-gradient(135deg, #C2410C, #9A3412);
         }
 
+        .drive-viewer-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(20, 20, 20, 0.72);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+        }
+        .drive-viewer-overlay.open {
+            display: flex;
+        }
+        .drive-viewer-box {
+            background: #fff;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 900px;
+            height: 92vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+        }
+        .drive-viewer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+        .drive-viewer-title {
+            font-weight: 700;
+            font-size: 0.62rem;
+            color: var(--forest);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 55%;
+        }
+        .drive-viewer-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .drive-viewer-body {
+            flex: 1;
+            background: #f2f2f2;
+        }
+        .drive-viewer-body iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
         .toast-container {
             position: fixed;
             bottom: calc(var(--footer-height) + 16px);
@@ -6260,10 +6316,58 @@ textarea{ resize:vertical; min-height:56px; }
             // Prefer the Drive copy when we have one -- it's a normal https
             // link (no Safari data: URI issues, no local-storage size limits,
             // and it survives even if this device's local storage is cleared).
+            // Show it in an embedded in-app viewer rather than navigating
+            // away to drive.google.com.
             const driveUrl = el.dataset.driveUrl;
-            if (driveUrl) { window.open(driveUrl, '_blank'); return; }
+            const previewUrl = el.dataset.drivePreviewUrl;
+            if (driveUrl) { openDriveReportViewer(driveUrl, previewUrl, el.dataset.filename); return; }
             openReportFile(el.dataset.url, el.dataset.filename);
         });
+
+        // ─── Embedded Drive report viewer ───────────────────────────────
+        // Shows a Drive-backed report inline (in an <iframe>) instead of
+        // navigating away to drive.google.com. Also opportunistically fixes
+        // sharing on the file first -- older reports uploaded before Drive
+        // sharing was set automatically will otherwise show Google's
+        // "you need permission" screen inside the iframe.
+        function driveFileIdFromUrl(url) {
+            if (!url) return '';
+            const m = url.match(/\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/);
+            return m ? m[1] : '';
+        }
+        function openDriveReportViewer(driveUrl, previewUrl, filename) {
+            const fileId = driveFileIdFromUrl(driveUrl) || driveFileIdFromUrl(previewUrl);
+            const embedUrl = previewUrl || (fileId ? 'https://drive.google.com/file/d/' + fileId + '/preview' : '');
+            let overlay = document.getElementById('driveViewerOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'driveViewerOverlay';
+                overlay.className = 'drive-viewer-overlay';
+                overlay.innerHTML = `
+                    <div class="drive-viewer-box">
+                        <div class="drive-viewer-header">
+                            <span class="drive-viewer-title"><i class="fas fa-file"></i> <span id="driveViewerFilename">Report</span></span>
+                            <div class="drive-viewer-actions">
+                                <a id="driveViewerOpenExternal" href="#" target="_blank" class="glass-btn" style="font-size:0.55rem;"><i class="fas fa-up-right-from-square"></i> Open in Drive</a>
+                                <button type="button" class="glass-btn danger" id="driveViewerClose" style="font-size:0.55rem;"><i class="fas fa-times"></i> Close</button>
+                            </div>
+                        </div>
+                        <div class="drive-viewer-body"><iframe id="driveViewerFrame" allow="autoplay" src=""></iframe></div>
+                    </div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#driveViewerClose').addEventListener('click', () => overlay.classList
+                    .remove('open'));
+                overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove(
+                    'open'); });
+            }
+            overlay.querySelector('#driveViewerFilename').textContent = filename || 'Report';
+            overlay.querySelector('#driveViewerOpenExternal').href = driveUrl;
+            overlay.querySelector('#driveViewerFrame').src = embedUrl;
+            overlay.classList.add('open');
+            if (fileId && typeof gasCall === 'function') {
+                gasCall('ensureFileSharing', { fileId: fileId }).catch(() => {});
+            }
+        }
 
         // District-level key: SAME for ARCS & DRCS of the same district (society list only).
         // Every district AND every office (ARCS vs DRCS) within that district gets its own
@@ -7834,6 +7938,7 @@ async function doAdminLogin() {
                 (t.reportUrl ? '<a href="#" class="js-view-report" data-url="' + t.reportUrl.replace(/"/g, '&quot;') +
                     '" data-filename="' + (t.reportFileName || 'report').replace(/"/g, '&quot;') +
                     '" data-drive-url="' + (t.reportDriveUrl || '').replace(/"/g, '&quot;') +
+                    '" data-drive-preview-url="' + (t.reportDrivePreviewUrl || '').replace(/"/g, '&quot;') +
                     '"><i class="fas fa-link"></i></a>' : '--') + '</td></tr>').join('');
             body.innerHTML = '<div class="att-summary-wrap"><table class="att-summary-table">' +
                 '<thead><tr><th>District</th><th>Office</th><th>Type</th><th>Society</th><th>Status</th><th>Report</th></tr></thead>' +
@@ -11201,7 +11306,7 @@ async function doAdminLogin() {
                             <span>${typeLabel}</span>
                             <span class="ri-date">${task.completedAt ? new Date(task.completedAt).toLocaleDateString() : '--'}</span>
                             ${task.timelinessNote ? `<div style="font-size:0.48rem;font-weight:700;color:${task.timelinessNote.includes('not') ? '#DC2626' : '#16A34A'};">${task.timelinessNote}</div>` : ''}
-                            ${task.reportUrl ? `<span class="ri-link"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}"><i class="fas fa-link"></i> View</a></span>` : '<span>No file</span>'}
+                            ${task.reportUrl ? `<span class="ri-link"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}" data-drive-preview-url="${attEscapeHtml(task.reportDrivePreviewUrl || '')}"><i class="fas fa-link"></i> View</a></span>` : '<span>No file</span>'}
                             ${(userRole !== 'inspector' && userRole !== 'rcs') ? (task.autoClosed ?
                                 `<button class="btn-sm" style="background:#EEF2FF;color:#4338CA;font-size:0.58rem;padding:5px 9px;margin-left:8px;" onclick="reopenTourTask('${task.id}')"><i class="fas fa-rotate-left"></i> Reopen</button>` :
                                 `<button class="btn-sm warning" onclick="unmarkTaskDone('${task.id}')" style="font-size:0.58rem;padding:5px 9px;margin-left:8px;"><i class="fas fa-undo-alt"></i> Undo</button>`) : ''}
@@ -11310,7 +11415,7 @@ async function doAdminLogin() {
                             <span>${typeLabel}</span>
                             <span class="ri-date">${task.completedAt ? new Date(task.completedAt).toLocaleDateString() : '--'}</span>
                             ${task.timelinessNote ? `<div style="font-size:0.48rem;font-weight:700;color:${task.timelinessNote.includes('not') ? '#DC2626' : '#16A34A'};">${task.timelinessNote}</div>` : ''}
-                            ${task.reportUrl ? `<span class="ri-link"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}"><i class="fas fa-link"></i> View</a></span>` : '<span>No file</span>'}
+                            ${task.reportUrl ? `<span class="ri-link"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}" data-drive-preview-url="${attEscapeHtml(task.reportDrivePreviewUrl || '')}"><i class="fas fa-link"></i> View</a></span>` : '<span>No file</span>'}
                             ${(userRole !== 'inspector' && userRole !== 'rcs') ? (task.autoClosed ?
                                 `<button class="btn-sm" style="background:#EEF2FF;color:#4338CA;font-size:0.58rem;padding:5px 9px;margin-left:8px;" onclick="reopenTourTask('${task.id}')"><i class="fas fa-rotate-left"></i> Reopen</button>` :
                                 `<button class="btn-sm warning" onclick="unmarkTaskDone('${task.id}')" style="font-size:0.58rem;padding:5px 9px;margin-left:8px;"><i class="fas fa-undo-alt"></i> Undo</button>`) : ''}
@@ -11364,7 +11469,7 @@ async function doAdminLogin() {
                         }
                         return `<div class="report-card" style="border-left-color:${isSubmitted ? '#16A34A' : '#F59E0B'};">
                           <div class="report-header"><span class="inspector-name"><i class="fas fa-user-shield"></i> ${inspName}</span><span class="report-status ${status}">${statusLabel}</span></div>
-                          <div class="report-body">${task.societyName ? `<div><i class="fas fa-home"></i> ${task.societyName}</div>` : ''}${task.notes ? `<div style="font-size:0.5rem;color:var(--mist);"><i class="fas fa-pencil-alt"></i> ${task.notes}</div>` : ''}${task.timelinessNote ? `<div style="font-size:0.48rem;font-weight:700;color:${task.timelinessNote.includes('not') ? '#DC2626' : '#16A34A'};">${task.timelinessNote}</div>` : ''}${task.reportUrl ? `<div style="font-size:0.5rem;"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}" style="color:var(--drive-blue);"><i class="fas fa-link"></i> View Report</a></div>` : ''}${countdownHtml}</div>
+                          <div class="report-body">${task.societyName ? `<div><i class="fas fa-home"></i> ${task.societyName}</div>` : ''}${task.notes ? `<div style="font-size:0.5rem;color:var(--mist);"><i class="fas fa-pencil-alt"></i> ${task.notes}</div>` : ''}${task.timelinessNote ? `<div style="font-size:0.48rem;font-weight:700;color:${task.timelinessNote.includes('not') ? '#DC2626' : '#16A34A'};">${task.timelinessNote}</div>` : ''}${task.reportUrl ? `<div style="font-size:0.5rem;"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}" data-drive-preview-url="${attEscapeHtml(task.reportDrivePreviewUrl || '')}" style="color:var(--drive-blue);"><i class="fas fa-link"></i> View Report</a></div>` : ''}${countdownHtml}</div>
                           <div class="report-actions">
                             ${(!isSubmitted && (userRole !== 'inspector' && userRole !== 'rcs' || (currentInspectorSession && task.inspectorId === currentInspectorSession.id))) ? `<button class="btn-sm warning" onclick="submitReport('${task.id}')"><i class="fas fa-upload"></i> Submit</button>` : ''}
                             ${(rt.isTour && userRole !== 'rcs' && (userRole !== 'inspector' || (currentInspectorSession && task.inspectorId === currentInspectorSession.id))) ? `<button class="btn-sm" style="background:#EEF2FF;color:#4338CA;" onclick="openTourGenerateFor('${task.id}')"><i class="fas fa-magic"></i> Generate</button>` : ''}
@@ -14623,7 +14728,7 @@ async function doAdminLogin() {
                 else if (isOverdue) statusIcon = '🔴';
                 return `<div class="task-card" style="border-left-color:${isCompleted ? '#16A34A' : isOverdue ? '#DC2626' : '#1E3A5F'};">
               <div class="task-header"><span class="task-type">${statusIcon} ${task.type === 'registration' ? '📝 Registration' : task.type === 'one_man_report' ? '📄 One Man Report' : '📊 ' + task.type.replace(/_/g,' ').toUpperCase()}</span><span class="task-status ${statusClass}">${statusLabel}</span></div>
-              <div class="task-body"><div><strong>Inspector:</strong> ${inspName}</div>${task.societyName ? `<div><strong>Society:</strong> ${task.societyName}</div>` : ''}<div class="task-meta"><span>📅 Assigned: ${task.assignedDate}</span>${task.dueDate ? `<span>⏰ Due: ${task.dueDate}</span>` : ''}${task.endDate ? `<span>📌 End: ${task.endDate}</span>` : ''}${countdownHtml}</div>${task.notes ? `<div style="font-size:0.5rem;color:var(--mist);margin-top:2px;">📝 ${task.notes}</div>` : ''}${task.timelinessNote ? `<div style="font-size:0.48rem;font-weight:700;color:${task.timelinessNote.includes('not') ? '#DC2626' : '#16A34A'};">${task.timelinessNote}</div>` : ''}${task.reportUrl ? `<div style="font-size:0.5rem;color:var(--forest);"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}" style="color:var(--drive-blue);">📎 View Report</a></div>` : ''}</div>
+              <div class="task-body"><div><strong>Inspector:</strong> ${inspName}</div>${task.societyName ? `<div><strong>Society:</strong> ${task.societyName}</div>` : ''}<div class="task-meta"><span>📅 Assigned: ${task.assignedDate}</span>${task.dueDate ? `<span>⏰ Due: ${task.dueDate}</span>` : ''}${task.endDate ? `<span>📌 End: ${task.endDate}</span>` : ''}${countdownHtml}</div>${task.notes ? `<div style="font-size:0.5rem;color:var(--mist);margin-top:2px;">📝 ${task.notes}</div>` : ''}${task.timelinessNote ? `<div style="font-size:0.48rem;font-weight:700;color:${task.timelinessNote.includes('not') ? '#DC2626' : '#16A34A'};">${task.timelinessNote}</div>` : ''}${task.reportUrl ? `<div style="font-size:0.5rem;color:var(--forest);"><a href="#" class="js-view-report" data-url="${attEscapeHtml(task.reportUrl)}" data-filename="${attEscapeHtml(task.reportFileName || 'report')}" data-drive-url="${attEscapeHtml(task.reportDriveUrl || '')}" data-drive-preview-url="${attEscapeHtml(task.reportDrivePreviewUrl || '')}" style="color:var(--drive-blue);">📎 View Report</a></div>` : ''}</div>
               <div class="task-footer">${(userRole !== 'inspector' && userRole !== 'rcs') ? `<button class="btn-sm success" onclick="markTaskDone('${task.id}')" title="Mark Done" style="${task.onTime === false ? 'opacity:.4;' : ''}"><i class="fas fa-circle-check"></i></button><button class="btn-sm warning" onclick="unmarkTaskDone('${task.id}')" title="Mark Undone" style="${task.onTime === true ? 'opacity:.4;' : ''}"><i class="fas fa-circle-xmark"></i></button>` : ''}${(!isCompleted && userRole !== 'inspector' && userRole !== 'rcs') ? `<button class="btn-sm edit" onclick="editTask('${task.id}')"><i class="fas fa-edit"></i></button>` : ''}${(!isCompleted && (userRole !== 'inspector' && userRole !== 'rcs' || (currentInspectorSession && task.inspectorId === currentInspectorSession.id))) ? `<button class="btn-sm warning" onclick="submitReport('${task.id}')"><i class="fas fa-upload"></i> Submit Report</button>` : ''}${(userRole !== 'inspector' && userRole !== 'rcs') ? `<button class="btn-sm delete" onclick="deleteTask('${task.id}')"><i class="fas fa-trash-alt"></i></button>` : ''}</div>
             </div>`;
             }).join('');
@@ -14996,6 +15101,7 @@ async function doAdminLogin() {
                 gUploadDocument(driveFolderPath, driveFileName, fileData).then(res => {
                     if (res && res.ok) {
                         task.reportDriveUrl = res.url;
+                        task.reportDrivePreviewUrl = res.previewUrl || '';
                         saveOfficeData();
                         showToast('📁 Also backed up to Drive.', 'success', 2500);
                         renderAllTasks();
