@@ -6368,6 +6368,15 @@ textarea{ resize:vertical; min-height:56px; }
         // sharing on the file first -- older reports uploaded before Drive
         // sharing was set automatically will otherwise show Google's
         // "you need permission" screen inside the iframe.
+        // Reg Date is stored as DD-MM-YYYY (sometimes DD/MM/YYYY), not
+        // YYYY-first -- slice(0,4) was grabbing the day+separator instead
+        // of the year (e.g. "30-03-2023".slice(0,4) === "30-0"). Pull out
+        // the one 4-digit run in the string instead, which is the year
+        // regardless of which separator or field order is used.
+        function regDateYear(dateStr) {
+            const matches = (dateStr || '').match(/\d{4}/g);
+            return matches ? matches[matches.length - 1] : '';
+        }
         function driveFileIdFromUrl(url) {
             if (!url) return '';
             const m = url.match(/\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/);
@@ -12978,7 +12987,7 @@ async function doAdminLogin() {
                         }
                         if (col === 'status') val = s.status || 'Functional';
                         if (col === 'regDate') {
-                            val = (s.regDate || '').slice(0, 4);
+                            val = regDateYear(s.regDate);
                         }
                         if (['accProfit', 'netProfit', 'accLoss', 'netLoss', 'govtLoan', 'bankLoan'].includes(col)) {
                             const fieldMap = { govtLoan: 'govtLoanDue', bankLoan: 'bankLoanDue' };
@@ -14100,7 +14109,7 @@ async function doAdminLogin() {
                 });
             } else if (col === 'lastElection') { displayValues = ['This Year', 'Next Year', 'Expired (>4 years)']; } else if (
                 col === 'regDate') {
-                displayValues = [...new Set(societies.map(s => (s.regDate || '').slice(0, 4)).filter(Boolean))]
+                displayValues = [...new Set(societies.map(s => regDateYear(s.regDate)).filter(Boolean))]
                     .sort().reverse();
             } else if (['accProfit', 'netProfit', 'accLoss', 'netLoss', 'govtLoan', 'bankLoan'].includes(col)) {
                 displayValues = ['Has value', 'None'];
@@ -14122,7 +14131,7 @@ async function doAdminLogin() {
                     if (col === 'land') v = s.land || 'No';
                     if (col === 'members') v = String(s.members || 0);
                     if (col === 'status') v = s.status || 'Functional';
-                    if (col === 'regDate') v = (s.regDate || '').slice(0, 4);
+                    if (col === 'regDate') v = regDateYear(s.regDate);
                     if (col === 'lastAGM') {
                         const color = getAGMColor(s.lastAGM);
                         const labels = { red: 'Red', 'light-green': 'Light Green',
