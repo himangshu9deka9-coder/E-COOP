@@ -633,6 +633,7 @@ textarea{ resize:vertical; min-height:56px; }
             -webkit-transform: translate3d(0, 0, 0);
             transform: translate3d(0, 0, 0);
             will-change: transform;
+            isolation: isolate;
         }
         .society-action-row .action-btn {
             display: flex;
@@ -793,12 +794,21 @@ textarea{ resize:vertical; min-height:56px; }
             box-shadow: var(--shadow-sm);
             overflow: hidden;
             margin: 0;
+            /* Own compositing layer -- keeps this card's rounded corners
+               rendering correctly while the sticky action-row above it and
+               the horizontally-scrolling table below it are both animating
+               on iOS Safari at the same time (their independent scroll/
+               sticky layers could otherwise visually clip into each other
+               mid-scroll). */
+            isolation: isolate;
+            transform: translateZ(0);
         }
         .table-scroll {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             max-height: 62vh;
             overflow-y: auto;
+            transform: translateZ(0);
         }
         table {
             width: auto;
@@ -12962,52 +12972,58 @@ async function doAdminLogin() {
         let societySearchQuery = '';
         let societyDistrictFilter = '__all';
 
-        function getFiltered() {
-            const search = (societySearchQuery || '').trim().toLowerCase();
-            const result = societies.filter(s => {
-                if (societyDistrictFilter && societyDistrictFilter !== '__all') {
-                    const d = s._srcDistrict || currentDistrict;
-                    if (d !== societyDistrictFilter) return false;
-                }
-                for (let col of columns) {
-                    if (col === 'actions') continue;
-                    const filterVal = columnFilters[col];
-                    if (filterVal && filterVal !== '__all') {
-                        let val = s[col] || '';
-                        if (col === 'land') val = s.land || 'No';
-                        if (col === 'members') val = String(s.members || 0);
-                        if (col === 'lastAGM' && s.lastAGM) {
-                            const color = getAGMColor(s.lastAGM);
-                            const labels = { red: 'Red', 'light-green': 'Light Green', 'dark-green': 'Dark Green' };
-                            val = s.lastAGM + ' (' + (labels[color] || '--') + ')';
-                        }
-                        if (col === 'lastElection' && s.lastElection) {
-                            val = s.lastElection;
-                            if (isMoreThan4YearsOld(s.lastElection)) val = '⚠️ ' + val;
-                        }
-                        if (col === 'status') val = s.status || 'Functional';
-                        if (col === 'regDate') {
-                            val = regDateYear(s.regDate);
-                        }
-                        if (['accProfit', 'netProfit', 'accLoss', 'netLoss', 'govtLoan', 'bankLoan'].includes(col)) {
-                            const fieldMap = { govtLoan: 'govtLoanDue', bankLoan: 'bankLoanDue' };
-                            const raw = s[fieldMap[col] || col] || 0;
-                            const bucket = raw > 0 ? 'Has value' : 'None';
-                            if (bucket !== filterVal) return false;
-                            continue;
-                        }
-                        if (val !== filterVal) return false;
+        // Shared per-society filter check. Pass excludeCol to skip that one
+        // column's own filter -- used when building THAT column's own
+        // dropdown, so its counts reflect every OTHER active filter without
+        // being collapsed by its own current selection.
+        function societyMatchesFilters(s, excludeCol) {
+            if (societyDistrictFilter && societyDistrictFilter !== '__all') {
+                const d = s._srcDistrict || currentDistrict;
+                if (d !== societyDistrictFilter) return false;
+            }
+            for (let col of columns) {
+                if (col === 'actions' || col === excludeCol) continue;
+                const filterVal = columnFilters[col];
+                if (filterVal && filterVal !== '__all') {
+                    let val = s[col] || '';
+                    if (col === 'land') val = s.land || 'No';
+                    if (col === 'members') val = String(s.members || 0);
+                    if (col === 'lastAGM' && s.lastAGM) {
+                        const color = getAGMColor(s.lastAGM);
+                        const labels = { red: 'Red', 'light-green': 'Light Green', 'dark-green': 'Dark Green' };
+                        val = s.lastAGM + ' (' + (labels[color] || '--') + ')';
                     }
+                    if (col === 'lastElection' && s.lastElection) {
+                        val = s.lastElection;
+                        if (isMoreThan4YearsOld(s.lastElection)) val = '⚠️ ' + val;
+                    }
+                    if (col === 'status') val = s.status || 'Functional';
+                    if (col === 'regDate') {
+                        val = regDateYear(s.regDate);
+                    }
+                    if (['accProfit', 'netProfit', 'accLoss', 'netLoss', 'govtLoan', 'bankLoan'].includes(col)) {
+                        const fieldMap = { govtLoan: 'govtLoanDue', bankLoan: 'bankLoanDue' };
+                        const raw = s[fieldMap[col] || col] || 0;
+                        const bucket = raw > 0 ? 'Has value' : 'None';
+                        if (bucket !== filterVal) return false;
+                        continue;
+                    }
+                    if (val !== filterVal) return false;
                 }
-                if (search) {
-                    const haystack = [
-                        s.name, s.district, s.block, s.sector, s.reg,
-                        s.phone, s.status, s.structure, s.patta, s.dag
-                    ].filter(Boolean).join(' ').toLowerCase();
-                    if (!haystack.includes(search)) return false;
-                }
-                return true;
-            });
+            }
+            const search = (societySearchQuery || '').trim().toLowerCase();
+            if (search) {
+                const haystack = [
+                    s.name, s.district, s.block, s.sector, s.reg,
+                    s.phone, s.status, s.structure, s.patta, s.dag
+                ].filter(Boolean).join(' ').toLowerCase();
+                if (!haystack.includes(search)) return false;
+            }
+            return true;
+        }
+
+        function getFiltered() {
+            const result = societies.filter(s => societyMatchesFilters(s, null));
 
             result.sort(compareSocietyOrder);
 
@@ -14093,6 +14109,12 @@ async function doAdminLogin() {
             const dropdown = document.createElement('div');
             dropdown.className = 'header-filter-dropdown';
             dropdown.dataset.col = col;
+            // Scope every option/count in this dropdown to societies that
+            // already match every OTHER active filter (search + other
+            // columns) -- so picking Reg Date 2020 then opening Sector only
+            // shows sectors (and counts) that actually exist among 2020
+            // registrations, instead of the all-time totals.
+            const scoped = societies.filter(s => societyMatchesFilters(s, col));
             let displayValues = getUniqueValues(col);
             if (col === 'status') {
                 const statuses = ['Functional', 'Non-Functional / Dormant', 'Under Liquidation'];
@@ -14100,23 +14122,36 @@ async function doAdminLogin() {
             } else if (col === 'land') { displayValues = ['Yes', 'No'].filter(v => displayValues.includes(v) || v ===
                     'No'); } else if (col === 'lastAGM') {
                 displayValues = ['Red', 'Light Green', 'Dark Green'].filter(v => {
-                    if (v === 'Red') return societies.some(s => getAGMColor(s.lastAGM) === 'red');
-                    if (v === 'Light Green') return societies.some(s => getAGMColor(s.lastAGM) ===
+                    if (v === 'Red') return scoped.some(s => getAGMColor(s.lastAGM) === 'red');
+                    if (v === 'Light Green') return scoped.some(s => getAGMColor(s.lastAGM) ===
                         'light-green');
-                    if (v === 'Dark Green') return societies.some(s => getAGMColor(s.lastAGM) ===
+                    if (v === 'Dark Green') return scoped.some(s => getAGMColor(s.lastAGM) ===
                         'dark-green');
                     return false;
                 });
-            } else if (col === 'lastElection') { displayValues = ['This Year', 'Next Year', 'Expired (>4 years)']; } else if (
+            } else if (col === 'lastElection') {
+                displayValues = ['This Year', 'Next Year', 'Expired (>4 years)'].filter(v => {
+                    if (v === 'This Year') return scoped.some(s => getElectionYear(s.lastElection) === new Date()
+                        .getFullYear());
+                    if (v === 'Next Year') return scoped.some(s => getElectionYear(s.lastElection) === new Date()
+                        .getFullYear() + 1);
+                    if (v === 'Expired (>4 years)') return scoped.some(s => isMoreThan4YearsOld(s.lastElection));
+                    return false;
+                });
+            } else if (
                 col === 'regDate') {
-                displayValues = [...new Set(societies.map(s => regDateYear(s.regDate)).filter(Boolean))]
+                displayValues = [...new Set(scoped.map(s => regDateYear(s.regDate)).filter(Boolean))]
                     .sort().reverse();
             } else if (['accProfit', 'netProfit', 'accLoss', 'netLoss', 'govtLoan', 'bankLoan'].includes(col)) {
-                displayValues = ['Has value', 'None'];
+                const fieldMap = { govtLoan: 'govtLoanDue', bankLoan: 'bankLoanDue' };
+                displayValues = ['Has value', 'None'].filter(v => scoped.some(s => {
+                    const raw = s[fieldMap[col] || col] || 0;
+                    return v === 'Has value' ? raw > 0 : raw <= 0;
+                }));
             }
             const allOpt = document.createElement('div');
             allOpt.className = 'filter-option' + (columnFilters[col] === '__all' ? ' active' : '');
-            allOpt.innerHTML = `<span class="check">✓</span> All <span class="count">${societies.length}</span>`;
+            allOpt.innerHTML = `<span class="check">✓</span> All <span class="count">${scoped.length}</span>`;
             allOpt.addEventListener('click', function(e) { e.stopPropagation();
                 columnFilters[col] = '__all';
                 closeAllDropdowns();
@@ -14126,7 +14161,7 @@ async function doAdminLogin() {
                 const opt = document.createElement('div');
                 const isActive = columnFilters[col] === val;
                 opt.className = 'filter-option' + (isActive ? ' active' : '');
-                const count = societies.filter(s => {
+                const count = scoped.filter(s => {
                     let v = s[col] || '';
                     if (col === 'land') v = s.land || 'No';
                     if (col === 'members') v = String(s.members || 0);
@@ -14197,7 +14232,8 @@ async function doAdminLogin() {
 
         // ─── GET UNIQUE VALUES ───────────────────────────────────────
         function getUniqueValues(col) {
-            const vals = societies.map(s => s[col] || '').filter(v => v !== '');
+            const scoped = societies.filter(s => societyMatchesFilters(s, col));
+            const vals = scoped.map(s => s[col] || '').filter(v => v !== '');
             return [...new Set(vals)].sort();
         }
 
