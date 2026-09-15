@@ -8542,7 +8542,12 @@ async function doAdminLogin() {
                     e.stopPropagation();
                     if (activeDropdown && activeDropdown.dataset.col === col) { closeAllDropdowns(); return; }
                     closeAllDropdowns();
-                    buildFilterDropdown(col);
+                    // Measuring the header's position on the SAME frame as a
+                    // prior filter change (which just rebuilt the whole
+                    // table) can catch a layout mid-reflow and land the
+                    // dropdown far from the header it belongs to. Waiting a
+                    // couple of frames guarantees layout has settled first.
+                    requestAnimationFrame(() => requestAnimationFrame(() => buildFilterDropdown(col)));
                 });
             });
             document.getElementById('tableScroll')?.addEventListener('scroll', closeAllDropdowns);
@@ -14150,7 +14155,7 @@ async function doAdminLogin() {
         function buildFilterDropdown(col) {
             const th = document.querySelector(`#headerRow th[data-col="${col}"]`);
             if (!th) return;
-            const existing = th.querySelector('.header-filter-dropdown');
+            const existing = document.querySelector(`.header-filter-dropdown[data-col="${col}"]`);
             if (existing) existing.remove();
             const dropdown = document.createElement('div');
             dropdown.className = 'header-filter-dropdown';
@@ -14272,7 +14277,15 @@ async function doAdminLogin() {
                     update(); });
                 dropdown.appendChild(opt);
             });
-            th.appendChild(dropdown);
+            // Appended to body, not th: th sits inside .table-scroll, which
+            // now has a CSS transform (added for the earlier sticky-header
+            // fix) -- a transform on any ancestor changes what position:fixed
+            // measures against from the real viewport to that ancestor's own
+            // box, which is exactly what was sending this dropdown to the
+            // wrong place. body is never transformed, so fixed positioning
+            // here always means "the actual screen," matching the
+            // getBoundingClientRect() coordinates used below.
+            document.body.appendChild(dropdown);
             const rect = th.getBoundingClientRect();
             dropdown.style.position = 'fixed';
             dropdown.style.top = (rect.bottom + 4) + 'px';
