@@ -975,6 +975,34 @@ textarea{ resize:vertical; min-height:56px; }
         .header-filter-dropdown.show {
             display: block;
         }
+        .filter-range-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 10px 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 2px;
+        }
+        .filter-range-input {
+            width: 0;
+            flex: 1;
+            min-width: 0;
+            font-size: 0.62rem;
+            padding: 4px 6px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+            color: var(--slate);
+        }
+        .filter-range-sep {
+            font-size: 0.62rem;
+            color: var(--slate);
+        }
+        .filter-range-apply {
+            font-size: 0.6rem;
+            padding: 5px 10px;
+            white-space: nowrap;
+        }
         .header-filter-dropdown .filter-option {
             padding: 4px 12px;
             font-size: 0.65rem;
@@ -6386,6 +6414,15 @@ textarea{ resize:vertical; min-height:56px; }
         function regDateYear(dateStr) {
             const matches = (dateStr || '').match(/\d{4}/g);
             return matches ? matches[matches.length - 1] : '';
+        }
+        // The Registration Number (e.g. "G-01/2021-22") is essentially a
+        // unique ID per society, so filtering on the raw string produced a
+        // dropdown with one option per society. It already carries a fiscal
+        // year though ("2021-22"), so group by that instead -- same idea as
+        // regDateYear above.
+        function regFiscalYear(regStr) {
+            const m = (regStr || '').match(/\d{4}-\d{2,4}/);
+            return m ? m[0] : '';
         }
         function driveFileIdFromUrl(url) {
             if (!url) return '';
@@ -13000,6 +13037,15 @@ async function doAdminLogin() {
                     if (col === 'status') val = s.status || 'Functional';
                     if (col === 'regDate') {
                         val = regDateYear(s.regDate);
+                        const rangeMatch = String(filterVal).match(/^range:(\d{4}):(\d{4})$/);
+                        if (rangeMatch) {
+                            const y = parseInt(val, 10);
+                            if (!y || y < parseInt(rangeMatch[1], 10) || y > parseInt(rangeMatch[2], 10)) return false;
+                            continue;
+                        }
+                    }
+                    if (col === 'reg') {
+                        val = regFiscalYear(s.reg);
                     }
                     if (['accProfit', 'netProfit', 'accLoss', 'netLoss', 'govtLoan', 'bankLoan'].includes(col)) {
                         const fieldMap = { govtLoan: 'govtLoanDue', bankLoan: 'bankLoanDue' };
@@ -14142,6 +14188,9 @@ async function doAdminLogin() {
                 col === 'regDate') {
                 displayValues = [...new Set(scoped.map(s => regDateYear(s.regDate)).filter(Boolean))]
                     .sort().reverse();
+            } else if (col === 'reg') {
+                displayValues = [...new Set(scoped.map(s => regFiscalYear(s.reg)).filter(Boolean))]
+                    .sort().reverse();
             } else if (['accProfit', 'netProfit', 'accLoss', 'netLoss', 'govtLoan', 'bankLoan'].includes(col)) {
                 const fieldMap = { govtLoan: 'govtLoanDue', bankLoan: 'bankLoanDue' };
                 displayValues = ['Has value', 'None'].filter(v => scoped.some(s => {
@@ -14157,6 +14206,29 @@ async function doAdminLogin() {
                 closeAllDropdowns();
                 update(); });
             dropdown.appendChild(allOpt);
+            if (col === 'regDate') {
+                const rangeWrap = document.createElement('div');
+                rangeWrap.className = 'filter-range-row';
+                rangeWrap.addEventListener('click', e => e.stopPropagation());
+                const currentRange = String(columnFilters[col] || '').match(/^range:(\d{4}):(\d{4})$/);
+                rangeWrap.innerHTML = `
+                    <input type="number" class="filter-range-input" id="filterRangeFrom" placeholder="From" value="${currentRange ? currentRange[1] : ''}">
+                    <span class="filter-range-sep">&ndash;</span>
+                    <input type="number" class="filter-range-input" id="filterRangeTo" placeholder="To" value="${currentRange ? currentRange[2] : ''}">
+                    <button type="button" class="glass-btn filter-range-apply" id="filterRangeApply">Go</button>
+                `;
+                dropdown.appendChild(rangeWrap);
+                dropdown.querySelector('#filterRangeApply').addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const fromVal = parseInt(document.getElementById('filterRangeFrom').value, 10);
+                    const toVal = parseInt(document.getElementById('filterRangeTo').value, 10);
+                    if (!fromVal || !toVal) return;
+                    const lo = Math.min(fromVal, toVal), hi = Math.max(fromVal, toVal);
+                    columnFilters[col] = `range:${lo}:${hi}`;
+                    closeAllDropdowns();
+                    update();
+                });
+            }
             displayValues.forEach(val => {
                 const opt = document.createElement('div');
                 const isActive = columnFilters[col] === val;
@@ -14167,6 +14239,7 @@ async function doAdminLogin() {
                     if (col === 'members') v = String(s.members || 0);
                     if (col === 'status') v = s.status || 'Functional';
                     if (col === 'regDate') v = regDateYear(s.regDate);
+                    if (col === 'reg') v = regFiscalYear(s.reg);
                     if (col === 'lastAGM') {
                         const color = getAGMColor(s.lastAGM);
                         const labels = { red: 'Red', 'light-green': 'Light Green',
