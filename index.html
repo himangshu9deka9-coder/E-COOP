@@ -4284,6 +4284,108 @@ textarea{ resize:vertical; min-height:56px; }
             display: none;
         }
 
+        /* ─── SCHEME PAGE: futuristic redesign, scoped so it never touches
+           the Service grid, print templates, or module-picker modals that
+           share the same .app-icon-tile / .coop-module-card classes ─── */
+        .scheme-page {
+            position: relative;
+        }
+        .scheme-page::before {
+            content: '';
+            position: absolute;
+            top: -12px;
+            left: -12px;
+            right: -12px;
+            height: 160px;
+            background:
+                radial-gradient(circle at 18% 0%, rgba(212, 175, 55, 0.14), transparent 60%),
+                radial-gradient(circle at 92% 8%, rgba(45, 106, 79, 0.16), transparent 55%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .scheme-page > * {
+            position: relative;
+            z-index: 1;
+        }
+        .scheme-page .module-top-bar {
+            background: linear-gradient(120deg, rgba(27, 67, 50, 0.96), rgba(45, 106, 79, 0.92) 55%, rgba(64, 145, 108, 0.9));
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            box-shadow: 0 6px 20px rgba(27, 67, 50, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .scheme-page .module-top-bar .module-title {
+            color: #fff;
+        }
+        .scheme-page .module-top-bar .module-title .mod-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 35% 30%, var(--golden), #96761f 75%);
+            box-shadow: 0 0 10px var(--golden-glow), 0 0 0 3px rgba(255, 255, 255, 0.12);
+            font-size: 0.78rem;
+            color: #2a2208;
+        }
+        .scheme-page .module-top-bar .glass-btn.coop-glass {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.3), rgba(212, 175, 55, 0.12));
+            border-color: rgba(212, 175, 55, 0.55);
+            color: #fff;
+        }
+        .scheme-page .module-top-bar .glass-btn.coop-glass:hover {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.45), rgba(212, 175, 55, 0.22));
+        }
+        .scheme-page .module-top-bar .glass-btn:not(.coop-glass) {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: rgba(255, 255, 255, 0.28);
+            color: #fff;
+        }
+        .scheme-page .module-top-bar .glass-btn:not(.coop-glass):hover {
+            background: rgba(255, 255, 255, 0.24);
+        }
+        .scheme-page .app-icon-grid {
+            grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+            gap: 20px 12px;
+            padding: 14px 4px 18px;
+        }
+        .scheme-page .app-icon-tile {
+            transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .scheme-page .app-icon-tile:active {
+            transform: scale(0.94);
+        }
+        .scheme-page .app-icon-tile .ai-icon {
+            max-width: 68px;
+            border-radius: 26%;
+            background: linear-gradient(145deg, #1f3f30 0%, #2D6A4F 45%, #40916C 100%);
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            box-shadow: 0 6px 16px rgba(27, 67, 50, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            position: relative;
+            overflow: hidden;
+            transition: box-shadow 0.25s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .scheme-page .app-icon-tile .ai-icon::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(115deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 32%);
+            pointer-events: none;
+        }
+        .scheme-page .app-icon-tile:hover .ai-icon {
+            box-shadow: 0 10px 22px rgba(27, 67, 50, 0.34), 0 0 18px rgba(212, 175, 55, 0.5);
+            transform: translateY(-2px) scale(1.04);
+        }
+        .scheme-page .app-icon-tile .ai-name {
+            font-weight: 700;
+            color: var(--forest);
+            font-size: 0.56rem;
+        }
+        .scheme-page .app-icon-tile .ai-badge {
+            background: linear-gradient(135deg, var(--golden), #a9842a);
+            box-shadow: 0 2px 8px rgba(212, 175, 55, 0.55), 0 0 0 2px #fff;
+            color: #2a2208;
+        }
+
         .reports-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
@@ -8716,6 +8818,7 @@ async function doAdminLogin() {
         // ─── SCHEME PAGE ─────────────────────────────────────────────
         function renderSchemePage(container) {
             let html = `
+            <div class="scheme-page">
             <div class="module-top-bar">
               <div class="module-title"><span class="mod-icon"><i class="fas fa-project-diagram"></i></span> Cooperative Schemes</div>
               <div class="module-actions">
@@ -8724,6 +8827,7 @@ async function doAdminLogin() {
               </div>
             </div>
             <div id="schemeModuleGrid" class="coop-module-grid"></div>
+            </div>
           `;
             container.innerHTML = html;
             renderCoopModuleListInContainer('schemeModuleGrid');
