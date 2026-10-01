@@ -3614,6 +3614,136 @@ textarea{ resize:vertical; min-height:56px; }
             }
         }
 
+        /* ─── SCHEME MODULE DETAIL (the record list inside a scheme, e.g.
+           "PACS as CSC"): futuristic redesign, scoped to .coop-module-detail
+           so the legacy desktop coopModuleDetailOverlay modal and any other
+           reuse of .coop-table / .coop-stat-grid stay exactly as they are ─── */
+        .coop-module-detail .coop-detail-header {
+            background: linear-gradient(120deg, rgba(27, 67, 50, 0.97), rgba(45, 106, 79, 0.93) 55%, rgba(64, 145, 108, 0.9));
+            border-bottom: none;
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: var(--radius);
+            box-shadow: 0 6px 20px rgba(27, 67, 50, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .coop-module-detail .coop-detail-header > div:first-child {
+            color: #fff !important;
+            font-weight: 600;
+        }
+        .coop-module-detail .coop-detail-header .glass-btn {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: rgba(255, 255, 255, 0.28);
+            color: #fff;
+            flex-direction: column;
+            gap: 2px !important;
+            min-width: 48px;
+            padding: 6px 8px;
+            font-size: 0.48rem;
+        }
+        .coop-module-detail .coop-detail-header .glass-btn i {
+            font-size: 0.78rem;
+        }
+        .coop-module-detail .coop-detail-header .glass-btn:hover {
+            background: rgba(255, 255, 255, 0.24);
+            transform: translateY(-1px);
+        }
+        .coop-module-detail .coop-detail-header .glass-btn.coop-glass {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.32), rgba(212, 175, 55, 0.14));
+            border-color: rgba(212, 175, 55, 0.6);
+        }
+        .coop-module-detail .coop-detail-header .glass-btn.coop-glass:hover {
+            background: linear-gradient(135deg, rgba(212, 175, 55, 0.48), rgba(212, 175, 55, 0.24));
+        }
+        .coop-module-detail .coop-stat-grid {
+            background: transparent;
+            backdrop-filter: none;
+            border-bottom: none;
+            gap: 8px;
+            padding: 0 0 10px;
+        }
+        .coop-module-detail .coop-stat-tile {
+            background: linear-gradient(145deg, #FFFDF9, #F3EFE4);
+            border: 1px solid rgba(212, 175, 55, 0.35);
+            box-shadow: 0 3px 10px rgba(27, 67, 50, 0.08);
+            padding: 7px 10px;
+        }
+        .coop-module-detail .coop-stat-tile .t-label {
+            color: var(--moss);
+            opacity: 1;
+        }
+        .coop-module-detail .coop-stat-tile .t-val {
+            color: var(--forest);
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--forest), var(--golden));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .coop-module-detail .coop-table-wrap {
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(27, 67, 50, 0.1);
+            border: 1px solid rgba(212, 175, 55, 0.25);
+        }
+        .coop-module-detail .coop-table thead th {
+            background: linear-gradient(120deg, #1B4332, #2D6A4F);
+            color: #fff;
+            border-bottom: 2px solid var(--golden);
+        }
+        .coop-module-detail .coop-table tbody tr:nth-child(even) {
+            background: rgba(212, 175, 55, 0.05);
+        }
+        .coop-module-detail .coop-table tbody tr:hover {
+            background: rgba(45, 106, 79, 0.08);
+        }
+        .coop-module-detail .coop-record-card {
+            background: linear-gradient(145deg, #FFFDF9, #F6F2E8);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-left: 3px solid var(--moss);
+            box-shadow: 0 3px 10px rgba(27, 67, 50, 0.08);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+        .coop-module-detail .coop-record-card .rec-name::before {
+            background: linear-gradient(135deg, var(--moss), var(--golden));
+        }
+        .coop-module-detail td[colspan],
+        .coop-module-detail .coop-card-view:empty::after {
+            color: var(--mist);
+        }
+        .coop-module-detail .coop-empty-state {
+            text-align: center;
+            padding: 34px 16px;
+            color: var(--mist);
+            background: linear-gradient(145deg, rgba(212, 175, 55, 0.06), rgba(45, 106, 79, 0.05));
+            border-radius: var(--radius);
+        }
+        .coop-module-detail .coop-empty-icon {
+            width: 46px;
+            height: 46px;
+            margin: 0 auto 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(145deg, #1f3f30, #40916C);
+            color: var(--golden);
+            font-size: 1.1rem;
+            box-shadow: 0 4px 14px rgba(27, 67, 50, 0.3);
+        }
+        .coop-module-detail .coop-empty-title {
+            font-family: 'DM Serif Display', serif;
+            font-size: 0.85rem;
+            color: var(--forest);
+            margin-bottom: 4px;
+        }
+        .coop-module-detail .coop-empty-sub {
+            font-size: 0.6rem;
+            max-width: 220px;
+            margin: 0 auto;
+            line-height: 1.4;
+        }
+
         .fin-modal-head {
             background: linear-gradient(135deg, #1E40AF, #2563EB);
             padding: 12px 16px 10px;
@@ -11791,7 +11921,7 @@ async function doAdminLogin() {
                 if (!container) return;
                 const visibleCols = (mod.columns || []).filter(c => c.visible !== false);
                 let html = `
-              <div style="max-width:1100px;margin:0 auto;width:100%;">
+              <div class="coop-module-detail" style="max-width:1100px;margin:0 auto;width:100%;">
                 <div class="mod-toolbar-sticky coop-detail-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding:10px 14px;">
                   <div style="font-family:'DM Serif Display',serif;font-size:1.05rem;color:#0A1628;letter-spacing:0.2px;">${mod.name}</div>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
@@ -11813,7 +11943,7 @@ async function doAdminLogin() {
                   <table class="coop-table" id="coopDetailTableMod">
                     <thead><tr>${visibleCols.map(c => `<th style="white-space:nowrap;">${c.label}</th>`).join('')}<th style="min-width:70px;">Actions</th></tr></thead>
                     <tbody id="coopDetailRowsMod">
-                      ${mod.records.length === 0 ? `<tr><td colspan="${visibleCols.length+1}" style="text-align:center;padding:20px;color:var(--mist);">No records yet.</td></tr>` :
+                      ${mod.records.length === 0 ? `<tr><td colspan="${visibleCols.length+1}" style="text-align:center;padding:0;border-bottom:none;"><div class="coop-empty-state"><div class="coop-empty-icon"><i class="fas fa-folder-open"></i></div><div class="coop-empty-title">No records yet</div><div class="coop-empty-sub">${(userRole === 'inspector' && !allowInspectorWrite) || userRole === 'rcs' ? 'Nothing has been added to this scheme yet.' : 'Click <strong>Add</strong> above to create the first record.'}</div></div></td></tr>` :
                         mod.records.map((rec, idx) => {
                           const row = visibleCols.map(c => {
                             let val = rec[c.key] !== undefined ? rec[c.key] : '';
@@ -11832,7 +11962,11 @@ async function doAdminLogin() {
                     </tbody>
                   </table>
                   <div class="coop-card-view" id="coopCardViewMod">
-                    ${mod.records.map((rec, idx) => {
+                    ${mod.records.length === 0 ? `<div class="coop-empty-state">
+                        <div class="coop-empty-icon"><i class="fas fa-folder-open"></i></div>
+                        <div class="coop-empty-title">No records yet</div>
+                        <div class="coop-empty-sub">${(userRole === 'inspector' && !allowInspectorWrite) || userRole === 'rcs' ? 'Nothing has been added to this scheme yet.' : 'Tap <strong>Add</strong> above to create the first record.'}</div>
+                      </div>` : mod.records.map((rec, idx) => {
                       return `<div class="coop-record-card" data-rec-idx="${idx}">
                         <div class="rec-name">${rec.name || 'Record ' + (idx+1)}</div>
                         <div class="rec-fields">
