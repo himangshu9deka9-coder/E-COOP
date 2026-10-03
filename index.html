@@ -4433,7 +4433,12 @@ textarea{ resize:vertical; min-height:56px; }
             pointer-events: none;
             z-index: 0;
         }
-        .scheme-page > * {
+        /* Only the icon grid needs lifting above the decorative glow --
+           .module-top-bar already manages its own stacking via position:
+           sticky, and forcing position:relative on it here (as an earlier
+           version of this rule did) fought with its own "top" offset and
+           visually dropped the whole bar down onto the grid below it. */
+        .scheme-page > #schemeModuleGrid {
             position: relative;
             z-index: 1;
         }
@@ -4483,6 +4488,15 @@ textarea{ resize:vertical; min-height:56px; }
         }
         .scheme-page .app-icon-tile:active {
             transform: scale(0.94);
+        }
+        /* Emoji glyphs carry their own built-in color that CSS `color`
+           can't touch, so a grayscale+darken filter is the only way to make
+           them read as flat black line-icons like the other modules
+           (Inspector, Society, etc). Scoped to the emoji span itself, not
+           the tile, so the green/gold gradient tile background is untouched. */
+        .scheme-page .app-icon-tile .ai-icon .ai-emoji {
+            filter: grayscale(100%) brightness(0.25) contrast(1.3);
+            display: inline-block;
         }
         .scheme-page .app-icon-tile .ai-icon {
             max-width: 68px;
@@ -8992,7 +9006,7 @@ async function doAdminLogin() {
                 <i class="fas fa-map-marker-alt"></i> ${off.districtLabel} · ${off.officeType}
               </div>`;
                 html += `<div class="app-icon-tile coop-module-card" onclick="rcsOpenSchemeModule(${idx}, 'pmksk')">
-                <div class="ai-icon" style="font-size:1.8rem;">🌾</div>
+                <div class="ai-icon" style="font-size:1.8rem;"><span class="ai-emoji">🌾</span></div>
                 ${pmkskSocCount > 0 ? `<span class="ai-badge">${pmkskSocCount}</span>` : `<span class="ai-badge" style="background:#DC2626;">0</span>`}
                 <div class="ai-name">PMKSK Fertilizer</div>
                 <div style="font-size:0.42rem;color:var(--mist);">${pmkskSocCount} societ${pmkskSocCount === 1 ? 'y' : 'ies'} with data</div>
@@ -9007,7 +9021,7 @@ async function doAdminLogin() {
                     if (!mod) return;
                     const recordCount = (mod.records || []).length;
                     html += `<div class="app-icon-tile coop-module-card" onclick="rcsOpenSchemeModule(${idx}, '${id}')">
-                <div class="ai-icon" style="font-size:1.8rem;">${mod.icon || '📋'}</div>
+                <div class="ai-icon" style="font-size:1.8rem;"><span class="ai-emoji">${mod.icon || '📋'}</span></div>
                 ${recordCount > 0 ? `<span class="ai-badge">${recordCount}</span>` : ''}
                 <div class="ai-name">${mod.name}</div>
                 <div style="font-size:0.42rem;color:var(--mist);">${recordCount} societ${recordCount === 1 ? 'y' : 'ies'} with data</div>
@@ -9072,7 +9086,7 @@ async function doAdminLogin() {
             const showPmksk = containerId === 'schemeModuleGrid';
             const pmkskTileHtml = showPmksk ?
                 `<div class="app-icon-tile coop-module-card" onclick="openModuleWindow('pmksk')">
-                <div class="ai-icon" style="font-size:1.8rem;">🌾</div>
+                <div class="ai-icon" style="font-size:1.8rem;"><span class="ai-emoji">🌾</span></div>
                 <div class="ai-name">PMKSK Fertilizer</div>
               </div>` : '';
             if (moduleIds.length === 0) {
@@ -9088,7 +9102,7 @@ async function doAdminLogin() {
                 const recordCount = (mod.records || []).length;
                 const iconEmoji = mod.icon || '📋';
                 return `<div class="app-icon-tile coop-module-card" data-module-id="${id}">
-                <div class="ai-icon" style="font-size:1.8rem;">${iconEmoji}</div>
+                <div class="ai-icon" style="font-size:1.8rem;"><span class="ai-emoji">${iconEmoji}</span></div>
                 ${recordCount > 0 ? `<span class="ai-badge">${recordCount}</span>` : ''}
                 <div class="ai-name">${mod.name}</div>
                 <div class="card-hold-actions hidden">
@@ -10702,6 +10716,127 @@ async function doAdminLogin() {
         }
 
         // ─── PMKSK IN MODULE ────────────────────────────────────────
+        const PMKSK_FERTILIZER_TYPES = [
+            { group: '', items: ['All Fertilizers'] },
+            { group: 'Nano Fertilizers', items: ['Nano Urea Plus (Liquid)', 'Nano DAP (Liquid)', 'Nano Zinc', 'Nano Copper'] },
+            { group: 'Primary & Complex Nutrients (Conventional)', items: ['Urea', 'DAP (18:46:0)', 'NPK Complex (10:26:26)', 'NPK Complex (12:32:16)', 'NP Complex Fertilizer (20:20:0:13)'] },
+            { group: 'Water-Soluble Fertilizers (WSF)', items: ['M.A.P. (12:61:0)', 'Potassium Nitrate (13:0:45)', 'Urea Phosphate (17:44:0)', 'N.P.K. (19:19:19)', 'M.K.P. (0:52:34)', 'Calcium Nitrate', 'Urea Phosphate with S.O.P. (18:18:18 with 6.1% S)', 'S.O.P. (0:0:50)'] },
+            { group: 'Bio-Fertilizers & Organic Growth Promoters', items: ['Rhizobium', 'Azotobacter', 'Acetobacter', 'Azospirillum', 'Phosphate Solubilising Bacteria', 'Potassium Mobilizing Bio-fertiliser', 'Zinc Solubilizing Bacteria', 'NPK Liquid Consortia', 'Sagarika Granular', 'Sagarika Liquid'] },
+            { group: 'Micronutrients', items: ['Boron (B 14.5%)', 'Boron (B 20%)', 'Zinc Sulphate Monohydrate (Zn 33%, S 15%)'] }
+        ];
+        function pmkskFertilizerOptionsHtml(selected) {
+            return PMKSK_FERTILIZER_TYPES.map(g => {
+                const opts = g.items.map(it => `<option value="${it.replace(/"/g, '&quot;')}" ${it === selected ? 'selected' : ''}>${it}</option>`).join('');
+                return g.group ? `<optgroup label="${g.group}">${opts}</optgroup>` : opts;
+            }).join('');
+        }
+        const PMKSK_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'Annual'];
+        // A month entry may have an `items` breakdown (new) or just the old
+        // flat fields (legacy). This always returns a non-empty items array
+        // so every piece of code can work off one shape.
+        function pmkskEntryItems(entry) {
+            if (entry.items && entry.items.length) return entry.items;
+            return [{
+                type: 'All Fertilizers', pq: entry.purchaseQty || 0, pa: entry.purchaseRupees || 0,
+                saleType: 'All Fertilizers', sq: entry.soldQty || 0, sa: entry.salesRupees || 0
+            }];
+        }
+        // Per-society month-wise ledger, opened by pressing a society's name.
+        // Shows every fertilizer line across every month in one spreadsheet-
+        // style table, with a grand total row at the bottom.
+        function openPmkskSocietyLedger(society, yearSelId) {
+            openModuleWindow('pmksk');
+            setTimeout(() => {
+                const container = document.getElementById('mwBodyContent');
+                if (!container) return;
+                renderPmkskSocietyLedgerInto(container, society, yearSelId);
+            }, 0);
+        }
+        function renderPmkskSocietyLedgerInto(container, society, yearSelId) {
+            const year = document.getElementById(yearSelId)?.value || Object.keys(pmkskData).sort().pop();
+            const socData = (pmkskData[year] && pmkskData[year].societies[society]) || { monthly: [] };
+            const canWrite = !((userRole === 'inspector' && !inspectorCanEditScheme('pmksk')) || userRole === 'rcs');
+            const sortedEntries = (socData.monthly || [])
+                .map((entry, idx) => ({ entry, idx }))
+                .sort((a, b) => PMKSK_MONTHS.indexOf(a.entry.month) - PMKSK_MONTHS.indexOf(b.entry.month));
+
+            let grandPQ = 0, grandSQ = 0, grandPA = 0, grandSA = 0;
+            let rowsHtml = '';
+            if (sortedEntries.length === 0) {
+                rowsHtml = `<tr><td colspan="8" style="text-align:center;padding:0;border:none;"><div class="coop-empty-state"><div class="coop-empty-icon"><i class="fas fa-seedling"></i></div><div class="coop-empty-title">No monthly entries yet</div><div class="coop-empty-sub">${canWrite ? 'Tap <strong>Add Entry</strong> above to record the first month.' : 'Nothing has been recorded for this society yet.'}</div></div></td></tr>`;
+            } else {
+                sortedEntries.forEach(({ entry, idx }) => {
+                    const items = pmkskEntryItems(entry);
+                    items.forEach((it, i) => {
+                        grandPQ += it.pq; grandSQ += it.sq; grandPA += it.pa; grandSA += it.sa;
+                        rowsHtml += `<tr>
+                          ${i === 0 ? `<td rowspan="${items.length}" style="font-weight:700;color:var(--forest);vertical-align:top;background:rgba(212,175,55,0.06);">${entry.month}</td>` : ''}
+                          <td>${it.type}</td>
+                          <td style="text-align:right;">${it.pq.toFixed(2)} MT</td>
+                          <td style="text-align:right;">₹${it.pa.toLocaleString()}</td>
+                          <td>${it.saleType}</td>
+                          <td style="text-align:right;">${it.sq.toFixed(2)} MT</td>
+                          <td style="text-align:right;">₹${it.sa.toLocaleString()}</td>
+                          <td style="text-align:right;font-weight:700;">₹${(it.pa + it.sa).toLocaleString()}</td>
+                          ${i === 0 ? `<td rowspan="${items.length}" style="vertical-align:top;">${canWrite ? `<div class="row-actions"><button class="btn-sm edit" data-pmksk-ledger-edit="${idx}"><i class="fas fa-edit"></i></button><button class="btn-sm delete" data-pmksk-ledger-delete="${idx}"><i class="fas fa-trash-alt"></i></button></div>` : ''}</td>` : ''}
+                        </tr>`;
+                    });
+                });
+            }
+
+            container.innerHTML = `
+            <div class="coop-module-detail" style="max-width:1100px;margin:0 auto;width:100%;">
+              <div class="mod-toolbar-sticky coop-detail-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding:10px 14px;">
+                <div>
+                  <div style="font-family:'DM Serif Display',serif;font-size:1rem;">${society}</div>
+                  <div style="font-size:0.55rem;opacity:0.85;">PMKSK Fertilizer Data &middot; ${year}</div>
+                </div>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                  ${canWrite ? `<button class="glass-btn coop-glass" id="pmkskLedgerAddBtn"><i class="fas fa-plus"></i> Add Entry</button>` : ''}
+                  <button class="glass-btn" id="pmkskLedgerBackBtn"><i class="fas fa-arrow-left"></i> Back to list</button>
+                </div>
+              </div>
+              <div class="coop-stat-grid" style="margin-bottom:8px;">
+                <div class="coop-stat-tile"><div class="t-label"><i class="fas fa-weight-hanging"></i> Purchase Qty</div><div class="t-val">${grandPQ.toFixed(2)} MT</div></div>
+                <div class="coop-stat-tile"><div class="t-label"><i class="fas fa-shopping-cart"></i> Sale Qty</div><div class="t-val">${grandSQ.toFixed(2)} MT</div></div>
+                <div class="coop-stat-tile"><div class="t-label"><i class="fas fa-rupee-sign"></i> Purchase Amt</div><div class="t-val">₹${grandPA.toLocaleString()}</div></div>
+                <div class="coop-stat-tile wide"><div class="t-label"><i class="fas fa-rupee-sign"></i> Total Amount (Purchase + Sale)</div><div class="t-val">₹${(grandPA+grandSA).toLocaleString()}</div></div>
+              </div>
+              <div class="coop-table-wrap">
+                <table class="coop-table">
+                  <thead><tr>
+                    <th>Month</th><th>Purchase Fertilizer</th><th>Purchase Qty</th><th>Purchase Amt</th>
+                    <th>Sale Fertilizer</th><th>Sale Qty</th><th>Sale Amt</th><th>Row Total</th><th>Actions</th>
+                  </tr></thead>
+                  <tbody>${rowsHtml}</tbody>
+                </table>
+              </div>
+            </div>`;
+
+            container.querySelector('#pmkskLedgerBackBtn')?.addEventListener('click', () => openModuleWindow('pmksk'));
+            container.querySelector('#pmkskLedgerAddBtn')?.addEventListener('click', () => {
+                openPmkskHeadForm(society, -1, yearSelId, () => renderPmkskSocietyLedgerInto(container, society, yearSelId));
+            });
+            container.querySelectorAll('[data-pmksk-ledger-edit]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    openPmkskHeadForm(society, parseInt(btn.dataset.pmkskLedgerEdit), yearSelId,
+                        () => renderPmkskSocietyLedgerInto(container, society, yearSelId));
+                });
+            });
+            container.querySelectorAll('[data-pmksk-ledger-delete]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = parseInt(btn.dataset.pmkskLedgerDelete);
+                    const monthName = socData.monthly[idx].month;
+                    if (confirm(`Delete "${monthName}"?`)) {
+                        socData.monthly.splice(idx, 1);
+                        savePmkskData();
+                        renderPmkskSocietyLedgerInto(container, society, yearSelId);
+                        showToast(`Deleted "${monthName}"`, 'success');
+                    }
+                });
+            });
+        }
+
         function pmkskFlattenYearData(year) {
             const yearData = pmkskData[year];
             if (!yearData) return [];
@@ -11003,7 +11138,7 @@ async function doAdminLogin() {
                 el.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const name = this.dataset.society;
-                    if (name) showSocietyDetail(name);
+                    if (name) openPmkskSocietyLedger(name, 'pmkskYearSelectMod');
                 });
             });
             listEl.querySelectorAll('[data-pmksk-action]').forEach(btn => {
@@ -11015,7 +11150,7 @@ async function doAdminLogin() {
                         showToast(userRole === 'rcs' ? 'RCS combined view is read-only.' : 'PMKSK is not assigned to you — view only.', 'error');
                         return;
                     }
-                    if (action === 'months') openPmkskMonthMod(society);
+                    if (action === 'months') openPmkskSocietyLedger(society, 'pmkskYearSelectMod');
                     else if (action === 'delete') {
                         if (confirm(`Delete "${society}" and all its data?`)) {
                             delete pmkskData[year].societies[society];
@@ -11102,67 +11237,133 @@ async function doAdminLogin() {
             if (!year) return;
             const socData = pmkskData[year].societies[society];
             const isEdit = idx >= 0;
-            const entry = isEdit ? socData.monthly[idx] : { month: '', purchaseQty: '', soldQty: '', purchaseRupees: '', salesRupees: '' };
-            const fieldStyle = 'width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:inherit;font-size:0.8rem;outline:none;';
-            const labelStyle = 'font-size:0.62rem;font-weight:600;color:var(--slate);display:block;margin-bottom:3px;';
+            const entry = isEdit ? socData.monthly[idx] : { month: '', items: [] };
+            // formItems is the working copy edited in this form. A legacy
+            // flat entry (no .items) is converted to one "All Fertilizers"
+            // line automatically, so editing an old entry never loses data.
+            let formItems = isEdit ? pmkskEntryItems(entry).map(it => ({ ...it })) :
+                [{ type: 'All Fertilizers', pq: '', pa: '', saleType: 'All Fertilizers', sq: '', sa: '' }];
+            const fieldStyle = 'width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-family:inherit;font-size:0.72rem;outline:none;';
+            const labelStyle = 'font-size:0.58rem;font-weight:600;color:var(--slate);display:block;margin-bottom:2px;';
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
             overlay.style.display = 'flex';
             overlay.style.zIndex = '1100';
             overlay.innerHTML = `
-            <div class="modal" style="max-width:420px;">
+            <div class="modal" style="max-width:480px;">
               <div class="modal-header" style="border-top:3px solid var(--leaf);">
                 <h2 style="color:var(--forest);"><i class="fas fa-seedling"></i> ${isEdit ? 'Edit' : 'Add'} Monthly Entry</h2>
                 <div class="sub">${society} &middot; ${year}</div>
               </div>
-              <div class="modal-body">
-                <div class="form-group"><label style="${labelStyle}"><i class="fas fa-calendar"></i> Month / Period</label>
-                  <input type="text" id="pmkskHeadMonth" placeholder="e.g. January, Annual" value="${(entry.month || '').replace(/"/g,'&quot;')}" style="${fieldStyle}" /></div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-                  <div class="form-group"><label style="${labelStyle}"><i class="fas fa-weight-hanging"></i> Purchase Qty (MT)</label>
-                    <input type="number" step="0.01" id="pmkskHeadPQ" value="${entry.purchaseQty}" style="${fieldStyle}" /></div>
-                  <div class="form-group"><label style="${labelStyle}"><i class="fas fa-shopping-cart"></i> Sold Qty (MT)</label>
-                    <input type="number" step="0.01" id="pmkskHeadSQ" value="${entry.soldQty}" style="${fieldStyle}" /></div>
-                  <div class="form-group"><label style="${labelStyle}"><i class="fas fa-rupee-sign"></i> Purchase Amt (₹)</label>
-                    <input type="number" step="0.01" id="pmkskHeadPA" value="${entry.purchaseRupees}" style="${fieldStyle}" /></div>
-                  <div class="form-group"><label style="${labelStyle}"><i class="fas fa-rupee-sign"></i> Sales Amt (₹)</label>
-                    <input type="number" step="0.01" id="pmkskHeadSA" value="${entry.salesRupees}" style="${fieldStyle}" /></div>
-                </div>
-                <div id="pmkskHeadProfitPreview" style="margin-top:10px;padding:8px 10px;border-radius:var(--radius-sm);background:var(--mint);color:var(--forest);font-size:0.68rem;font-weight:600;display:none;line-height:1.5;"></div>
+              <div class="modal-body" style="max-height:62vh;overflow-y:auto;">
+                <div class="form-group"><label style="${labelStyle}"><i class="fas fa-calendar"></i> Month</label>
+                  <select id="pmkskHeadMonth" style="${fieldStyle}">
+                    <option value="">Select month...</option>
+                    ${PMKSK_MONTHS.map(m => `<option value="${m}" ${m === entry.month ? 'selected' : ''}>${m}</option>`).join('')}
+                  </select></div>
+                <div id="pmkskItemsWrap" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+                <button type="button" class="glass-btn primary-glass" id="pmkskAddItemBtn" style="margin-top:8px;font-size:0.6rem;"><i class="fas fa-plus"></i> Add Fertilizer</button>
+                <div id="pmkskTotalsBox" style="margin-top:12px;padding:9px 11px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#1B4332,#2D6A4F);color:#fff;font-size:0.65rem;line-height:1.7;"></div>
               </div>
               <div class="modal-footer"><button class="btn btn-ghost" id="pmkskHeadCancelMod"><i class="fas fa-times"></i> Cancel</button><button class="btn btn-primary" id="pmkskHeadConfirmMod"><i class="fas fa-check"></i> ${isEdit ? 'Save Changes' : 'Add Entry'}</button></div>
             </div>`;
             document.body.appendChild(overlay);
 
-            const paInput = overlay.querySelector('#pmkskHeadPA');
-            const saInput = overlay.querySelector('#pmkskHeadSA');
-            const preview = overlay.querySelector('#pmkskHeadProfitPreview');
-            function updateHeadPreview() {
-                const pa = parseFloat(paInput.value) || 0;
-                const sa = parseFloat(saInput.value) || 0;
-                if (pa || sa) {
-                    const diff = sa - pa;
-                    preview.style.display = 'block';
-                    preview.innerHTML = `<i class="fas fa-chart-line"></i> Margin this entry: ₹${diff.toLocaleString()}<br/><span style="font-weight:400;color:var(--slate);">Final profit is confirmed at year-end, after closing stock is accounted for.</span>`;
-                } else {
-                    preview.style.display = 'none';
-                }
+            const itemsWrap = overlay.querySelector('#pmkskItemsWrap');
+            const totalsBox = overlay.querySelector('#pmkskTotalsBox');
+
+            function itemRowHtml(it, i) {
+                return `
+                <div class="pmksk-item-row" data-i="${i}" style="border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:8px;position:relative;background:var(--cream);">
+                  ${formItems.length > 1 ? `<button type="button" class="pmksk-item-remove" data-i="${i}" style="position:absolute;top:4px;right:4px;border:none;background:none;color:#DC2626;font-size:0.75rem;cursor:pointer;padding:2px 6px;">&times;</button>` : ''}
+                  <label style="${labelStyle}"><i class="fas fa-weight-hanging"></i> Purchase &mdash; Fertilizer Type</label>
+                  <select class="pmksk-item-type" data-i="${i}" style="${fieldStyle}">${pmkskFertilizerOptionsHtml(it.type)}</select>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+                    <div><label style="${labelStyle}">Purchase Qty (MT)</label><input type="number" step="0.01" class="pmksk-item-pq" data-i="${i}" value="${it.pq}" style="${fieldStyle}" /></div>
+                    <div><label style="${labelStyle}">Purchase Amt (₹)</label><input type="number" step="0.01" class="pmksk-item-pa" data-i="${i}" value="${it.pa}" style="${fieldStyle}" /></div>
+                  </div>
+                  <label style="${labelStyle}margin-top:6px;"><i class="fas fa-shopping-cart"></i> Sale &mdash; Fertilizer Type</label>
+                  <select class="pmksk-item-saletype" data-i="${i}" style="${fieldStyle}">${pmkskFertilizerOptionsHtml(it.saleType)}</select>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+                    <div><label style="${labelStyle}">Sale Qty (MT)</label><input type="number" step="0.01" class="pmksk-item-sq" data-i="${i}" value="${it.sq}" style="${fieldStyle}" /></div>
+                    <div><label style="${labelStyle}">Sale Amt (₹)</label><input type="number" step="0.01" class="pmksk-item-sa" data-i="${i}" value="${it.sa}" style="${fieldStyle}" /></div>
+                  </div>
+                </div>`;
             }
-            paInput?.addEventListener('input', updateHeadPreview);
-            saInput?.addEventListener('input', updateHeadPreview);
-            updateHeadPreview();
+            function renderItemRows() {
+                itemsWrap.innerHTML = formItems.map((it, i) => itemRowHtml(it, i)).join('');
+                itemsWrap.querySelectorAll('.pmksk-item-remove').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        formItems.splice(parseInt(this.dataset.i), 1);
+                        renderItemRows();
+                    });
+                });
+                updateTotals();
+            }
+            function readItemsFromDom() {
+                // Pull current input values back into formItems before
+                // re-rendering (e.g. on add/remove) so nothing typed is lost.
+                itemsWrap.querySelectorAll('.pmksk-item-row').forEach(row => {
+                    const i = parseInt(row.dataset.i);
+                    if (!formItems[i]) return;
+                    formItems[i] = {
+                        type: row.querySelector('.pmksk-item-type').value,
+                        pq: row.querySelector('.pmksk-item-pq').value,
+                        pa: row.querySelector('.pmksk-item-pa').value,
+                        saleType: row.querySelector('.pmksk-item-saletype').value,
+                        sq: row.querySelector('.pmksk-item-sq').value,
+                        sa: row.querySelector('.pmksk-item-sa').value
+                    };
+                });
+            }
+            function updateTotals() {
+                let tpq = 0, tsq = 0, tpa = 0, tsa = 0;
+                itemsWrap.querySelectorAll('.pmksk-item-row').forEach(row => {
+                    tpq += parseFloat(row.querySelector('.pmksk-item-pq').value) || 0;
+                    tsq += parseFloat(row.querySelector('.pmksk-item-sq').value) || 0;
+                    tpa += parseFloat(row.querySelector('.pmksk-item-pa').value) || 0;
+                    tsa += parseFloat(row.querySelector('.pmksk-item-sa').value) || 0;
+                });
+                totalsBox.innerHTML = `
+                  <div style="display:flex;justify-content:space-between;"><span>Total Purchase Qty</span><strong>${tpq.toFixed(2)} MT</strong></div>
+                  <div style="display:flex;justify-content:space-between;"><span>Total Sale Qty</span><strong>${tsq.toFixed(2)} MT</strong></div>
+                  <div style="display:flex;justify-content:space-between;"><span>Total Purchase Amount</span><strong>₹${tpa.toLocaleString()}</strong></div>
+                  <div style="display:flex;justify-content:space-between;"><span>Total Sale Amount</span><strong>₹${tsa.toLocaleString()}</strong></div>
+                  <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.3);margin-top:4px;padding-top:4px;font-size:0.72rem;"><span><i class="fas fa-rupee-sign"></i> TOTAL AMOUNT</span><strong>₹${(tpa+tsa).toLocaleString()}</strong></div>
+                `;
+            }
+            renderItemRows();
+            itemsWrap.addEventListener('input', updateTotals);
+            overlay.querySelector('#pmkskAddItemBtn')?.addEventListener('click', () => {
+                readItemsFromDom();
+                formItems.push({ type: 'All Fertilizers', pq: '', pa: '', saleType: 'All Fertilizers', sq: '', sa: '' });
+                renderItemRows();
+            });
 
             overlay.querySelector('#pmkskHeadCancelMod')?.addEventListener('click', () => overlay.remove());
             overlay.querySelector('#pmkskHeadConfirmMod')?.addEventListener('click', () => {
                 const month = (overlay.querySelector('#pmkskHeadMonth').value || '').trim();
-                if (!month) { showToast('Please enter a month/period name.', 'error'); return; }
+                if (!month) { showToast('Please select a month.', 'error'); return; }
                 const dup = socData.monthly.some((m, i) => i !== idx && m.month.toLowerCase() === month.toLowerCase());
                 if (dup) { showToast('This month already exists. Edit it instead.', 'error'); return; }
-                const pq = parseFloat(overlay.querySelector('#pmkskHeadPQ').value) || 0;
-                const sq = parseFloat(overlay.querySelector('#pmkskHeadSQ').value) || 0;
-                const pa = parseFloat(overlay.querySelector('#pmkskHeadPA').value) || 0;
-                const sa = parseFloat(overlay.querySelector('#pmkskHeadSA').value) || 0;
-                const newEntry = { month, purchaseQty: pq, soldQty: sq, purchaseRupees: pa, salesRupees: sa };
+                readItemsFromDom();
+                const items = formItems.map(it => ({
+                    type: it.type || 'All Fertilizers',
+                    pq: parseFloat(it.pq) || 0,
+                    pa: parseFloat(it.pa) || 0,
+                    saleType: it.saleType || 'All Fertilizers',
+                    sq: parseFloat(it.sq) || 0,
+                    sa: parseFloat(it.sa) || 0
+                }));
+                const pq = items.reduce((s, it) => s + it.pq, 0);
+                const sq = items.reduce((s, it) => s + it.sq, 0);
+                const pa = items.reduce((s, it) => s + it.pa, 0);
+                const sa = items.reduce((s, it) => s + it.sa, 0);
+                // items carries the full fertilizer-wise breakdown (used by the
+                // society ledger view); the four flat fields are kept in sync
+                // so every existing total/export/stock calculation elsewhere
+                // keeps working exactly as before, untouched.
+                const newEntry = { month, items, purchaseQty: pq, soldQty: sq, purchaseRupees: pa, salesRupees: sa };
                 if (isEdit) socData.monthly[idx] = newEntry; else socData.monthly.push(newEntry);
                 savePmkskData();
                 overlay.remove();
@@ -11170,6 +11371,7 @@ async function doAdminLogin() {
                 showToast(`${isEdit ? 'Updated' : 'Added'} "${month}" for ${society}`, 'success');
             });
         }
+
 
         function addPmkskSocietyMod(year) {
             const existing = Object.keys(pmkskData[year].societies);
@@ -12998,7 +13200,7 @@ async function doAdminLogin() {
                 el.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const name = this.dataset.society;
-                    if (name) showSocietyDetail(name);
+                    if (name) openPmkskSocietyLedger(name, 'pmkskYearSelect');
                 });
             });
             listEl.querySelectorAll('[data-pmksk-action]').forEach(btn => {
@@ -13010,7 +13212,7 @@ async function doAdminLogin() {
                         showToast(userRole === 'rcs' ? 'RCS combined view is read-only.' : 'PMKSK is not assigned to you — view only.', 'error');
                         return;
                     }
-                    if (action === 'months') openPmkskMonthModal(society);
+                    if (action === 'months') openPmkskSocietyLedger(society, 'pmkskYearSelect');
                     else if (action === 'delete') {
                         if (confirm(`Delete "${society}" and all its data?`)) {
                             delete pmkskData[year].societies[society];
