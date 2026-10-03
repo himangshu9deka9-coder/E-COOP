@@ -12113,9 +12113,55 @@ async function doAdminLogin() {
         }
 
         // ─── COOP MODULE DETAIL ─────────────────────────────────────
+        // "New MPACS / MFishery / MDairy" is a special scheme tile: instead
+        // of keeping its own manually-added records, it scans the live
+        // Society Directory and shows whichever category (sector) is
+        // selected -- so it's always in sync with Society data, no separate
+        // data entry needed for this module at all.
+        function openMpacsSchemeDetail(mod) {
+            openModuleWindow('coop');
+            setTimeout(() => {
+                const container = document.getElementById('mwBodyContent');
+                if (!container) return;
+                renderMpacsSchemeInto(container, mod, 'PACS');
+            }, 0);
+        }
+        function renderMpacsSchemeInto(container, mod, activeCat) {
+            const CATS = [
+                { key: 'PACS', label: 'MPACS', icon: 'fa-building' },
+                { key: 'Dairy', label: 'MDairy', icon: 'fa-industry' },
+                { key: 'Fishery', label: 'MFishery', icon: 'fa-water' }
+            ];
+            const matches = societies.filter(s => (s.sector || '') === activeCat);
+            container.innerHTML = `
+            <div class="coop-module-detail" style="max-width:1100px;margin:0 auto;width:100%;">
+              <div class="mod-toolbar-sticky coop-detail-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;padding:10px 14px;">
+                <div style="font-family:'DM Serif Display',serif;font-size:1.05rem;">${mod.name}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
+                ${CATS.map(c => `<button class="glass-btn ${c.key === activeCat ? 'coop-glass' : ''}" data-mpacs-cat="${c.key}" style="flex:1;min-width:100px;justify-content:center;"><i class="fas ${c.icon}"></i> ${c.label}</button>`).join('')}
+              </div>
+              <div class="coop-stat-grid" style="margin-bottom:8px;">
+                <div class="coop-stat-tile wide"><div class="t-label"><i class="fas fa-magnifying-glass"></i> Societies in "${activeCat}" sector</div><div class="t-val">${matches.length}</div></div>
+              </div>
+              <div class="coop-table-wrap">
+                <table class="coop-table">
+                  <thead><tr><th>Name</th><th>Block</th><th>Members</th><th>Status</th><th>Phone</th></tr></thead>
+                  <tbody>
+                    ${matches.length === 0 ? `<tr><td colspan="5" style="padding:0;border:none;"><div class="coop-empty-state"><div class="coop-empty-icon"><i class="fas fa-folder-open"></i></div><div class="coop-empty-title">No ${activeCat} societies found</div><div class="coop-empty-sub">Nothing in the Society Directory is tagged with the "${activeCat}" sector yet.</div></div></td></tr>` :
+                      matches.map(s => `<tr><td style="font-weight:600;">${s.name}</td><td>${s.block || '--'}</td><td>${s.members || 0}</td><td>${s.status || '--'}</td><td>${s.phone || '--'}</td></tr>`).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>`;
+            container.querySelectorAll('[data-mpacs-cat]').forEach(btn => {
+                btn.addEventListener('click', () => renderMpacsSchemeInto(container, mod, btn.dataset.mpacsCat));
+            });
+        }
         function openCoopModuleDetail(moduleId) {
             const mod = coopData[moduleId];
             if (!mod) { showToast('Module not found.', 'error'); return; }
+            if (moduleId === 'new_mpacs') { return openMpacsSchemeDetail(mod); }
             allowInspectorWrite = inspectorCanEditScheme(moduleId);
             openModuleWindow('coop');
             setTimeout(() => {
