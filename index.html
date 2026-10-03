@@ -16024,10 +16024,16 @@ async function doAdminLogin() {
                                 soc[field] = val;
                             }
                         }
+                        // Block/Sector default to empty rather than being
+                        // required -- a society missing just one of those
+                        // fields in the sheet is still a real society and
+                        // should still import, not get silently dropped.
+                        if (soc.block === undefined) soc.block = '';
+                        if (soc.sector === undefined) soc.sector = '';
                         return soc;
-                    }).filter(s => s.name && s.block && s.sector);
+                    }).filter(s => s.name);
                     if (imported.length === 0) {
-                        showToast('No valid rows found. Required columns: Name, Block, Sector',
+                        showToast('No valid rows found. A Name column is required.',
                             'error');
                         return;
                     }
